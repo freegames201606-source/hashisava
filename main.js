@@ -16,8 +16,11 @@ const quitBtn = document.getElementById('quitBtn');
 const difficultyEl = document.getElementById('difficulty');
 const hiscoreValue = document.getElementById('hiscore-value');
 const testBadge = document.getElementById('test-badge');
+const overlayTestBadge = document.getElementById('overlay-test-badge');
+const speedBar = document.getElementById('speed-bar');
 
-const GAME_SPEED = 0.5;
+const BASE_SPEED = 0.5;   // 通常のゲーム速度
+let gameSpeedMul = 1;      // テストモード時の倍率（1 / 2 / 5 / 10）
 
 let W = 0, H = 0;
 function resize() {
@@ -160,8 +163,15 @@ updateSoundBtn();
 /* ---- テストモード ---- */
 let testMode = false;
 function updateTestBadge() {
-  if (testMode) testBadge.classList.remove('hidden');
-  else testBadge.classList.add('hidden');
+  if (testMode) {
+    testBadge.classList.remove('hidden');
+    overlayTestBadge.classList.remove('hidden');
+  } else {
+    testBadge.classList.add('hidden');
+    overlayTestBadge.classList.add('hidden');
+  }
+  /* 速度バーはテストモードかつゲーム中のみ表示 */
+  updateSpeedBarVisibility();
 }
 function toggleTestMode() {
   testMode = !testMode;
@@ -190,6 +200,33 @@ updateTestBadge();
     }
   }
   overlayTitle.addEventListener('click', handle);
+})();
+
+/* ---- 速度変更ボタン（テストモード時のみ） ---- */
+function updateSpeedBarVisibility() {
+  /* ゲーム中（オーバーレイ非表示）かつテストモード時のみ表示 */
+  const inGame = overlayEl.classList.contains('hidden') && !gameOver;
+  if (testMode && inGame) {
+    speedBar.classList.remove('hidden');
+  } else {
+    speedBar.classList.add('hidden');
+  }
+}
+
+(function setupSpeedButtons() {
+  const buttons = speedBar.querySelectorAll('.speed-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const v = parseInt(btn.dataset.speed, 10) || 1;
+      gameSpeedMul = v;
+      buttons.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+  /* 初期選択：1x */
+  const first = speedBar.querySelector('.speed-btn[data-speed="1"]');
+  if (first) first.classList.add('selected');
 })();
 
 /* ---- 難易度 ---- */
@@ -241,6 +278,7 @@ let playerBarFlash = 0;
 
 let redEyeSpawned = false;
 let sirenStarted = false;
+let bgmStoppedForWarning = false;
 let bossBgmPlaying = false;
 
 function addHitStop(t) { if (t > hitStop) hitStop = t; }
@@ -266,7 +304,15 @@ function resetGame() {
   spawnTimer = 0; elapsed = 0; gameOver = false; paused = false; pauseRequested = false;
   level = 1; exp = 0; expNext = 5; pendingLevelUps = 0;
   hitStop = 0; shake = { time: 0, mag: 0 }; redFlash = 0; playerBarFlash = 0;
-  redEyeSpawned = false; sirenStarted = false; bossBgmPlaying = false;
+  redEyeSpawned = false; sirenStarted = false; bgmStoppedForWarning = false; bossBgmPlaying = false;
+  gameSpeedMul = 1;
+  /* 速度ボタンの選択状態を1xに戻す */
+  if (speedBar) {
+    const buttons = speedBar.querySelectorAll('.speed-btn');
+    buttons.forEach(b => b.classList.remove('selected'));
+    const first = speedBar.querySelector('.speed-btn[data-speed="1"]');
+    if (first) first.classList.add('selected');
+  }
   stats = {
     weapons: {
       basic:  { level: 1, timer: 0, interval: 0.55, damage: 10, speed: 460, pierce: 0 },
@@ -436,8 +482,14 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
+  /* 赤ロボ：47秒で警告開始、50秒で出現 */
   if (!redEyeSpawned) {
-    if (elapsed > 45 && elapsed <= 50) {
+    if (elapsed > 47 && elapsed <= 50) {
+      /* 警告中：BGM停止 & サイレン開始 */
+      if (!bgmStoppedForWarning && soundOn) {
+        AudioEngine.stopBGM();
+        bgmStoppedForWarning = true;
+      }
       if (!sirenStarted && soundOn) {
         AudioEngine.startSiren();
         sirenStarted = true;
@@ -630,11 +682,13 @@ function showLevelUpChoices() {
   if (pendingLevelUps <= 0) {
     paused = false;
     levelupEl.classList.add('hidden');
+    updateSpeedBarVisibility();
     lastTime = performance.now();
     return;
   }
   paused = true;
   levelupEl.classList.remove('hidden');
+  updateSpeedBarVisibility();
   choicesEl.innerHTML = '';
   const pool = UPGRADES.slice();
   const picked = [];
@@ -798,7 +852,8 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  if (!gameOver && redEyeSpawned === false && elapsed > 45 && elapsed < 50) {
+  /* 警告表示（47〜50秒） */
+  if (!gameOver && redEyeSpawned === false && elapsed > 47 && elapsed < 50) {
     const pulse = Math.floor(elapsed * 6) % 2 === 0;
     if (pulse) {
       ctx.save();
@@ -872,7 +927,7 @@ function loop(now) {
     doPause();
   }
 
-  let dt = rawDt * GAME_SPEED;
+  let dt = rawDt * BASE_SPEED * gameSpeedMul;
   if (hitStop > 0) {
     hitStop -= rawDt;
     dt = 0;
@@ -906,6 +961,7 @@ function beginGame() {
   topBar.classList.remove('hidden');
   resetGame();
   if (soundOn) { try { AudioEngine.startBGM(); } catch (err) {} }
+  updateSpeedBarVisibility();
   lastTime = performance.now();
   gameLoopId = requestAnimationFrame(loop);
 }
@@ -917,6 +973,7 @@ function showOverlay(title, msg, btnText) {
   startBtn.textContent = btnText || 'START';
   topBar.classList.add('hidden');
   pauseEl.classList.add('hidden');
+  speedBar.classList.add('hidden');
   overlayEl.classList.remove('hidden');
   refreshHiscore();
 }
@@ -928,6 +985,7 @@ function showStartScreen() {
   startBtn.textContent = 'START';
   topBar.classList.add('hidden');
   pauseEl.classList.add('hidden');
+  speedBar.classList.add('hidden');
   overlayEl.classList.remove('hidden');
   refreshHiscore();
 }
@@ -936,11 +994,13 @@ function doPause() {
   if (gameOver) return;
   paused = true;
   pauseEl.classList.remove('hidden');
+  speedBar.classList.add('hidden');
 }
 
 function doResume() {
   pauseEl.classList.add('hidden');
   paused = false;
+  updateSpeedBarVisibility();
   lastTime = performance.now();
 }
 
