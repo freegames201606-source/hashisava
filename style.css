@@ -41,6 +41,24 @@ canvas { display: block; touch-action: none; }
 .top-btn:active { transform: scale(0.95); }
 .top-btn.muted { border-color: #666; color: #666; }
 
+/* TEST MODE バッジ */
+#test-badge {
+  position: fixed;
+  top: calc(60px + var(--sat));
+  right: calc(8px + var(--sar));
+  z-index: 16;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #0d0d12;
+  background: #ffd54f;
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(255,213,79,0.6);
+  pointer-events: none;
+}
+#test-badge.hidden { display: none; }
+
 #pause {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.85);
@@ -119,6 +137,8 @@ canvas { display: block; touch-action: none; }
   letter-spacing: 3px;
   color: #4fc3f7;
   text-shadow: 0 0 20px rgba(79,195,247,0.6);
+  cursor: pointer;
+  touch-action: manipulation;
 }
 #overlay-msg { margin: 0; opacity: 0.85; font-size: 14px; }
 
@@ -157,7 +177,6 @@ canvas { display: block; touch-action: none; }
 }
 #overlay-help p { margin: 0; }
 
-/* ハイスコア（2行・大きめ） */
 #hiscore-line {
   margin: 8px 0 4px;
   display: flex;

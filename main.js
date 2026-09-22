@@ -15,6 +15,7 @@ const resumeBtn = document.getElementById('resumeBtn');
 const quitBtn = document.getElementById('quitBtn');
 const difficultyEl = document.getElementById('difficulty');
 const hiscoreValue = document.getElementById('hiscore-value');
+const testBadge = document.getElementById('test-badge');
 
 const GAME_SPEED = 0.5;
 
@@ -105,7 +106,7 @@ const ASSETS = {
     cat: './assets/enemies/cat.svg',
     panda: './assets/enemies/panda.svg',
     rabbit: './assets/enemies/rabbit.svg',
-    redeye: './assets/enemies/red-eye.png',
+    redeye: './assets/enemies/red-eye.svg',
   },
 };
 const images = { player: null, enemies: {} };
@@ -156,6 +157,45 @@ soundBtn.addEventListener('click', e => {
 });
 updateSoundBtn();
 
+/* ---- テストモード（無敵） ---- */
+let testMode = false;
+
+function updateTestBadge() {
+  if (testMode) testBadge.classList.remove('hidden');
+  else testBadge.classList.add('hidden');
+}
+
+function toggleTestMode() {
+  testMode = !testMode;
+  updateTestBadge();
+}
+updateTestBadge();
+
+/* タイトルを 2秒以内に7回タップ/クリック でテストモード切替 */
+(function setupSecretTap() {
+  let tapCount = 0;
+  let firstTapTime = 0;
+  const WINDOW_MS = 2000;
+  const NEED = 7;
+
+  function handle() {
+    const now = performance.now();
+    if (tapCount === 0 || now - firstTapTime > WINDOW_MS) {
+      /* 新しいカウント開始 */
+      tapCount = 1;
+      firstTapTime = now;
+      return;
+    }
+    tapCount++;
+    if (tapCount >= NEED) {
+      toggleTestMode();
+      tapCount = 0;
+      firstTapTime = 0;
+    }
+  }
+  overlayTitle.addEventListener('click', handle);
+})();
+
 /* ---- 難易度 ---- */
 const DIFFICULTIES = {
   easy:   { enemyHpMul: 0.7, enemySpeedMul: 0.85, spawnMul: 1.25, damageMul: 0.7 },
@@ -188,7 +228,7 @@ const ENEMY_TYPES = [
   { key: 'cat',    hp: 6,   speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,             drawScale: 1.0 },
   { key: 'panda',  hp: 30,  speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',         drawScale: 1.5 },
   { key: 'rabbit', hp: 10,  speed: 110, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん',       drawScale: 1.5 },
-  { key: 'redeye', hp: 300, speed: 300, r: 22, dmg: 60, exp: 60, color: '#f48fb1', name: '赤い彗星のかずき', drawScale: 1.5 },
+  { key: 'redeye', hp: 300, speed: 260, r: 22, dmg: 60, exp: 60, color: '#e53935', name: '赤い彗星のかずき', drawScale: 1.5 },
 ];
 
 let player = null;
@@ -203,7 +243,6 @@ let shake = { time: 0, mag: 0 };
 let redFlash = 0;
 let playerBarFlash = 0;
 
-/* 赤い単眼ロボ：1回だけ出現 */
 let redEyeSpawned = false;
 let warningTimer = 0;
 
@@ -277,7 +316,6 @@ function spawnEnemy() {
   });
 }
 
-/* 赤い単眼ロボを画面外から1匹だけ出現させる */
 function spawnRedEye() {
   const diff = stats.diff;
   const type = ENEMY_TYPES[4];
@@ -450,15 +488,21 @@ function update(dt) {
   for (const e of enemies) {
     const d = (player.x - e.x) ** 2 + (player.y - e.y) ** 2;
     if (d < (player.r + e.r) ** 2 && player.invuln <= 0) {
-      player.hp -= e.dmg; player.invuln = 0.4;
-      if (soundOn) AudioEngine.seHit();
-      spawnParticles(player.x, player.y, '#f66', 8);
-      addDamageNumber(player.x, player.y - player.r - 6, e.dmg, '#ff5252');
-      addShake(10, 0.22);
-      addHitStop(0.05);
-      redFlash = 0.25;
-      playerBarFlash = 0.4;
-      vibrate(30);
+      if (testMode) {
+        /* テストモード：ダメージ無効（ノックバック感だけ） */
+        player.invuln = 0.4;
+        spawnParticles(player.x, player.y, '#8ff', 6);
+      } else {
+        player.hp -= e.dmg; player.invuln = 0.4;
+        if (soundOn) AudioEngine.seHit();
+        spawnParticles(player.x, player.y, '#f66', 8);
+        addDamageNumber(player.x, player.y - player.r - 6, e.dmg, '#ff5252');
+        addShake(10, 0.22);
+        addHitStop(0.05);
+        redFlash = 0.25;
+        playerBarFlash = 0.4;
+        vibrate(30);
+      }
     }
   }
 
