@@ -105,7 +105,7 @@ const ASSETS = {
     cat: './assets/enemies/cat.svg',
     panda: './assets/enemies/panda.svg',
     rabbit: './assets/enemies/rabbit.svg',
-    redeye: './assets/enemies/red-eye.svg',
+    redeye: './assets/enemies/red-eye.png',
   },
 };
 const images = { player: null, enemies: {} };
@@ -184,11 +184,11 @@ function vibrate(ms) {
 
 /* ---- 敵タイプ ---- */
 const ENEMY_TYPES = [
-  { key: 'dog',    hp: 9,   speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060', name: null,       drawScale: 1.0 },
-  { key: 'cat',    hp: 6,   speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,       drawScale: 1.0 },
-  { key: 'panda',  hp: 30,  speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',   drawScale: 1.5 },
-  { key: 'rabbit', hp: 10,  speed: 110, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん', drawScale: 1.5 },
-  { key: 'redeye', hp: 300, speed: 60,  r: 22, dmg: 60, exp: 60, color: '#c62828', name: 'あかいの', drawScale: 1.5 },
+  { key: 'dog',    hp: 9,   speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060', name: null,             drawScale: 1.0 },
+  { key: 'cat',    hp: 6,   speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,             drawScale: 1.0 },
+  { key: 'panda',  hp: 30,  speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',         drawScale: 1.5 },
+  { key: 'rabbit', hp: 10,  speed: 110, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん',       drawScale: 1.5 },
+  { key: 'redeye', hp: 300, speed: 300, r: 22, dmg: 60, exp: 60, color: '#f48fb1', name: '赤い彗星のかずき', drawScale: 1.5 },
 ];
 
 let player = null;
@@ -281,7 +281,6 @@ function spawnEnemy() {
 function spawnRedEye() {
   const diff = stats.diff;
   const type = ENEMY_TYPES[4];
-  /* 画面の左端の外から登場（プレイヤーから見て分かりやすい位置） */
   const x = -40;
   const y = H / 2 + (Math.random() - 0.5) * 100;
   const hp = type.hp * diff.enemyHpMul;
@@ -390,11 +389,8 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
-  /* 赤い単眼ロボ：45秒で警告、50秒で1匹出現 */
   if (!redEyeSpawned) {
-    if (elapsed > 45 && elapsed <= 50) {
-      warningTimer += dt;
-    }
+    if (elapsed > 45 && elapsed <= 50) warningTimer += dt;
     if (elapsed >= 50) {
       spawnRedEye();
       redEyeSpawned = true;
@@ -696,7 +692,6 @@ function draw() {
     }
     ctx.globalAlpha = 1;
 
-    /* 主人公HPバー（頭上） */
     {
       const barW = 44;
       const barH = 5;
@@ -724,7 +719,6 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  /* 警告表示（45〜50秒） */
   if (!gameOver && redEyeSpawned === false && elapsed > 45 && elapsed < 50) {
     const pulse = Math.floor(elapsed * 6) % 2 === 0;
     if (pulse) {
