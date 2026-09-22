@@ -19,8 +19,8 @@ const testBadge = document.getElementById('test-badge');
 const overlayTestBadge = document.getElementById('overlay-test-badge');
 const speedBar = document.getElementById('speed-bar');
 
-const BASE_SPEED = 0.5;   // 通常のゲーム速度
-let gameSpeedMul = 1;      // テストモード時の倍率（1 / 2 / 5 / 10）
+const BASE_SPEED = 0.5;
+let gameSpeedMul = 1;
 
 let W = 0, H = 0;
 function resize() {
@@ -170,7 +170,6 @@ function updateTestBadge() {
     testBadge.classList.add('hidden');
     overlayTestBadge.classList.add('hidden');
   }
-  /* 速度バーはテストモードかつゲーム中のみ表示 */
   updateSpeedBarVisibility();
 }
 function toggleTestMode() {
@@ -202,9 +201,8 @@ updateTestBadge();
   overlayTitle.addEventListener('click', handle);
 })();
 
-/* ---- 速度変更ボタン（テストモード時のみ） ---- */
+/* ---- 速度変更ボタン ---- */
 function updateSpeedBarVisibility() {
-  /* ゲーム中（オーバーレイ非表示）かつテストモード時のみ表示 */
   const inGame = overlayEl.classList.contains('hidden') && !gameOver;
   if (testMode && inGame) {
     speedBar.classList.remove('hidden');
@@ -224,18 +222,17 @@ function updateSpeedBarVisibility() {
       btn.classList.add('selected');
     });
   });
-  /* 初期選択：1x */
   const first = speedBar.querySelector('.speed-btn[data-speed="1"]');
   if (first) first.classList.add('selected');
 })();
 
-/* ---- 難易度 ---- */
+/* ---- 難易度（初期：EASY） ---- */
 const DIFFICULTIES = {
   easy:   { enemyHpMul: 0.7, enemySpeedMul: 0.85, spawnMul: 1.25, damageMul: 0.7 },
   normal: { enemyHpMul: 1.0, enemySpeedMul: 1.0,  spawnMul: 1.0,  damageMul: 1.0 },
   hard:   { enemyHpMul: 1.5, enemySpeedMul: 1.15, spawnMul: 0.75, damageMul: 1.4 },
 };
-let difficultyKey = 'normal';
+let difficultyKey = 'easy';
 
 (function setupDifficulty() {
   const buttons = difficultyEl.querySelectorAll('.diff-btn');
@@ -298,7 +295,7 @@ function addDamageNumber(x, y, value, color) {
 }
 
 function resetGame() {
-  const diff = DIFFICULTIES[difficultyKey] || DIFFICULTIES.normal;
+  const diff = DIFFICULTIES[difficultyKey] || DIFFICULTIES.easy;
   player = { x: W / 2, y: H / 2, r: 18, speed: 240, hp: 100, maxHp: 100, invuln: 0 };
   enemies = []; bullets = []; orbs = []; effects = []; particles = []; damageNumbers = [];
   spawnTimer = 0; elapsed = 0; gameOver = false; paused = false; pauseRequested = false;
@@ -306,7 +303,6 @@ function resetGame() {
   hitStop = 0; shake = { time: 0, mag: 0 }; redFlash = 0; playerBarFlash = 0;
   redEyeSpawned = false; sirenStarted = false; bgmStoppedForWarning = false; bossBgmPlaying = false;
   gameSpeedMul = 1;
-  /* 速度ボタンの選択状態を1xに戻す */
   if (speedBar) {
     const buttons = speedBar.querySelectorAll('.speed-btn');
     buttons.forEach(b => b.classList.remove('selected'));
@@ -482,10 +478,8 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
-  /* 赤ロボ：47秒で警告開始、50秒で出現 */
   if (!redEyeSpawned) {
     if (elapsed > 47 && elapsed <= 50) {
-      /* 警告中：BGM停止 & サイレン開始 */
       if (!bgmStoppedForWarning && soundOn) {
         AudioEngine.stopBGM();
         bgmStoppedForWarning = true;
@@ -852,7 +846,6 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  /* 警告表示（47〜50秒） */
   if (!gameOver && redEyeSpawned === false && elapsed > 47 && elapsed < 50) {
     const pulse = Math.floor(elapsed * 6) % 2 === 0;
     if (pulse) {
