@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 動力パイプ風の首元 -->
+  <rect x="22" y="52" width="20" height="8" rx="3" fill="#3a0d0d"/>
+  <circle cx="26" cy="56" r="2" fill="#111"/>
+  <circle cx="32" cy="56" r="2" fill="#111"/>
+  <circle cx="38" cy="56" r="2" fill="#111"/>
+
+  <!-- 頭部ベース（赤） -->
+  <path d="M14 34 Q14 14 32 12 Q50 14 50 34 L48 48 Q32 54 16 48 Z" fill="#c62828"/>
+  <path d="M14 34 Q14 14 32 12 Q50 14 50 34 L48 48 Q32 54 16 48 Z" fill="none" stroke="#7a0d0d" stroke-width="1.5"/>
+
+  <!-- 角（アンテナ） -->
+  <path d="M30 13 L32 2 L34 13 Z" fill="#e53935"/>
+  <path d="M32 2 L32 13" stroke="#7a0d0d" stroke-width="1"/>
+
+  <!-- 側面の装飾 -->
+  <rect x="12" y="30" width="4" height="10" rx="1.5" fill="#8e1a1a"/>
+  <rect x="48" y="30" width="4" height="10" rx="1.5" fill="#8e1a1a"/>
+
+  <!-- 単眼（モノアイ） -->
+  <ellipse cx="32" cy="30" rx="11" ry="7" fill="#111"/>
+  <ellipse cx="32" cy="30" rx="8" ry="4.5" fill="#ff5252"/>
+  <ellipse cx="32" cy="30" rx="4" ry="2.4" fill="#fff"/>
+  <circle cx="32" cy="30" r="1.5" fill="#fff"/>
+
+  <!-- 口元の装甲 -->
+  <path d="M24 42 Q32 46 40 42" stroke="#7a0d0d" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <rect x="27" y="44" width="10" height="3" rx="1" fill="#7a0d0d"/>
+</svg>
