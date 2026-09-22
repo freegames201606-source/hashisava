@@ -152,26 +152,23 @@ soundBtn.addEventListener('click', e => {
   if (soundOn) {
     try { AudioEngine.resume(); AudioEngine.startBGM(); } catch (err) {}
   } else {
-    try { AudioEngine.stopBGM(); } catch (err) {}
+    try { AudioEngine.stopBGM(); AudioEngine.stopSiren(); } catch (err) {}
   }
 });
 updateSoundBtn();
 
-/* ---- テストモード（無敵） ---- */
+/* ---- テストモード ---- */
 let testMode = false;
-
 function updateTestBadge() {
   if (testMode) testBadge.classList.remove('hidden');
   else testBadge.classList.add('hidden');
 }
-
 function toggleTestMode() {
   testMode = !testMode;
   updateTestBadge();
 }
 updateTestBadge();
 
-/* タイトルを 2秒以内に7回タップ/クリック でテストモード切替 */
 (function setupSecretTap() {
   let tapCount = 0;
   let firstTapTime = 0;
@@ -181,7 +178,6 @@ updateTestBadge();
   function handle() {
     const now = performance.now();
     if (tapCount === 0 || now - firstTapTime > WINDOW_MS) {
-      /* 新しいカウント開始 */
       tapCount = 1;
       firstTapTime = now;
       return;
@@ -244,7 +240,8 @@ let redFlash = 0;
 let playerBarFlash = 0;
 
 let redEyeSpawned = false;
-let warningTimer = 0;
+let sirenStarted = false;
+let bossBgmPlaying = false;
 
 function addHitStop(t) { if (t > hitStop) hitStop = t; }
 function addShake(mag, dur) {
@@ -269,7 +266,7 @@ function resetGame() {
   spawnTimer = 0; elapsed = 0; gameOver = false; paused = false; pauseRequested = false;
   level = 1; exp = 0; expNext = 5; pendingLevelUps = 0;
   hitStop = 0; shake = { time: 0, mag: 0 }; redFlash = 0; playerBarFlash = 0;
-  redEyeSpawned = false; warningTimer = 0;
+  redEyeSpawned = false; sirenStarted = false; bossBgmPlaying = false;
   stats = {
     weapons: {
       basic:  { level: 1, timer: 0, interval: 0.55, damage: 10, speed: 460, pierce: 0 },
@@ -329,6 +326,19 @@ function spawnRedEye() {
   });
   addShake(20, 0.6);
   vibrate([80, 60, 120]);
+
+  if (soundOn) {
+    AudioEngine.stopBGM();
+    AudioEngine.stopSiren();
+    AudioEngine.seBossAppear();
+    /* ファンファーレの余韻を残してボスBGM開始 */
+    setTimeout(() => {
+      if (!gameOver && soundOn) {
+        AudioEngine.startBossBGM();
+        bossBgmPlaying = true;
+      }
+    }, 900);
+  }
 }
 
 function nearestEnemy(px, py) {
@@ -427,12 +437,21 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
+  /* 赤ロボ：45秒で警告開始、50秒で出現 */
   if (!redEyeSpawned) {
-    if (elapsed > 45 && elapsed <= 50) warningTimer += dt;
+    if (elapsed > 45 && elapsed <= 50) {
+      if (!sirenStarted && soundOn) {
+        AudioEngine.startSiren();
+        sirenStarted = true;
+      }
+    }
     if (elapsed >= 50) {
+      if (sirenStarted && soundOn) {
+        AudioEngine.stopSiren();
+        sirenStarted = false;
+      }
       spawnRedEye();
       redEyeSpawned = true;
-      warningTimer = 0;
     }
   }
 
@@ -489,7 +508,6 @@ function update(dt) {
     const d = (player.x - e.x) ** 2 + (player.y - e.y) ** 2;
     if (d < (player.r + e.r) ** 2 && player.invuln <= 0) {
       if (testMode) {
-        /* テストモード：ダメージ無効（ノックバック感だけ） */
         player.invuln = 0.4;
         spawnParticles(player.x, player.y, '#8ff', 6);
       } else {
@@ -507,15 +525,31 @@ function update(dt) {
   }
 
   const alive = [];
+  let bossDefeated = false;
   for (const e of enemies) {
     if (e.hp <= 0) {
       orbs.push({ x: e.x, y: e.y, r: 5, exp: e.type.exp });
       spawnParticles(e.x, e.y, e.type.color, 8);
       addHitStop(0.04);
       addShake(4, 0.1);
+      if (e.type.key === 'redeye') bossDefeated = true;
     } else alive.push(e);
   }
   enemies = alive;
+
+  if (bossDefeated && soundOn) {
+    AudioEngine.stopBGM();
+    AudioEngine.seBossDefeat();
+    addShake(18, 0.5);
+    vibrate([60, 40, 120]);
+    /* 撃破ファンファーレの余韻後、通常BGMに戻す */
+    setTimeout(() => {
+      if (!gameOver && soundOn) {
+        AudioEngine.startBGM();
+        bossBgmPlaying = false;
+      }
+    }, 1200);
+  }
 
   for (const o of orbs) {
     const dx = player.x - o.x, dy = player.y - o.y;
@@ -557,7 +591,11 @@ function update(dt) {
 
   if (player.hp <= 0) {
     player.hp = 0; gameOver = true;
-    if (soundOn) { AudioEngine.stopBGM(); AudioEngine.seGameOver(); }
+    if (soundOn) {
+      AudioEngine.stopSiren();
+      AudioEngine.stopBGM();
+      AudioEngine.seGameOver();
+    }
     addShake(20, 0.5);
     vibrate([60, 40, 120]);
 
@@ -920,7 +958,7 @@ resumeBtn.addEventListener('click', e => {
 quitBtn.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   stopLoop();
-  try { AudioEngine.stopBGM(); } catch (err) {}
+  try { AudioEngine.stopBGM(); AudioEngine.stopSiren(); } catch (err) {}
   showStartScreen();
 });
 
