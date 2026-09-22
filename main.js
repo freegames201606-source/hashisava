@@ -106,7 +106,7 @@ const ASSETS = {
     cat: './assets/enemies/cat.svg',
     panda: './assets/enemies/panda.svg',
     rabbit: './assets/enemies/rabbit.svg',
-    redeye: './assets/enemies/red-eye.svg',
+    redeye: './assets/enemies/red-eye.png',
   },
 };
 const images = { player: null, enemies: {} };
@@ -331,7 +331,6 @@ function spawnRedEye() {
     AudioEngine.stopBGM();
     AudioEngine.stopSiren();
     AudioEngine.seBossAppear();
-    /* ファンファーレの余韻を残してボスBGM開始 */
     setTimeout(() => {
       if (!gameOver && soundOn) {
         AudioEngine.startBossBGM();
@@ -437,7 +436,6 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
-  /* 赤ロボ：45秒で警告開始、50秒で出現 */
   if (!redEyeSpawned) {
     if (elapsed > 45 && elapsed <= 50) {
       if (!sirenStarted && soundOn) {
@@ -542,7 +540,6 @@ function update(dt) {
     AudioEngine.seBossDefeat();
     addShake(18, 0.5);
     vibrate([60, 40, 120]);
-    /* 撃破ファンファーレの余韻後、通常BGMに戻す */
     setTimeout(() => {
       if (!gameOver && soundOn) {
         AudioEngine.startBGM();
