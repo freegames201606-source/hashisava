@@ -19,6 +19,8 @@ const hiscoreValue = document.getElementById('hiscore-value');
 const testBadge = document.getElementById('test-badge');
 const overlayTestBadge = document.getElementById('overlay-test-badge');
 const speedBar = document.getElementById('speed-bar');
+const redStarsEl = document.getElementById('red-stars');
+const yellowStarsEl = document.getElementById('yellow-stars');
 
 const BASE_SPEED = 0.5;
 let gameSpeedMul = 1;
@@ -129,7 +131,7 @@ async function loadAssets() {
   for (const k in ASSETS.enemies) images.enemies[k] = await loadImage(ASSETS.enemies[k]);
 }
 
-/* ---- セーブ ---- */
+/* ---- セーブ（ハイスコア） ---- */
 const SAVE_KEY = 'hashichan_best_v1';
 function loadBest() {
   try {
@@ -145,7 +147,49 @@ function refreshHiscore() {
   if (hiscoreValue) hiscoreValue.textContent = bestTime.toFixed(1);
 }
 
-/* ---- 音 ON/OFF（スタート画面とゲーム中で共有） ---- */
+/* ---- セーブ（撃破回数） ---- */
+const KILL_KEY_RED = 'hashichan_redeye_kills_v1';
+const KILL_KEY_QUEEN = 'hashichan_queenbee_kills_v1';
+
+function loadKills(key) {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? parseInt(v, 10) || 0 : 0;
+  } catch (e) { return 0; }
+}
+function saveKills(key, n) {
+  try { localStorage.setItem(key, String(n)); } catch (e) {}
+}
+
+let redeyeKills = loadKills(KILL_KEY_RED);
+let queenbeeKills = loadKills(KILL_KEY_QUEEN);
+
+function killsToStars(kills) {
+  return Math.min(10, Math.floor(kills / 2));
+}
+
+function refreshStars() {
+  const redN = killsToStars(redeyeKills);
+  const yellowN = killsToStars(queenbeeKills);
+
+  if (redN > 0) {
+    redStarsEl.textContent = '★'.repeat(redN);
+    redStarsEl.classList.remove('hidden');
+  } else {
+    redStarsEl.textContent = '';
+    redStarsEl.classList.add('hidden');
+  }
+
+  if (yellowN > 0) {
+    yellowStarsEl.textContent = '★'.repeat(yellowN);
+    yellowStarsEl.classList.remove('hidden');
+  } else {
+    yellowStarsEl.textContent = '';
+    yellowStarsEl.classList.add('hidden');
+  }
+}
+
+/* ---- 音 ON/OFF ---- */
 let soundOn = true;
 function updateSoundUI() {
   if (soundOn) {
@@ -297,13 +341,13 @@ let sirenStarted = false;
 let bgmStoppedForWarning = false;
 let bossBgmPlaying = false;
 
-/* 中ボス（女王蜂）関連 */
+/* 中ボス関連 */
 let queenBeeSpawned = false;
 let queenBee = null;
 let queenSummonTimer = 0;
-const QUEEN_SUMMON_INTERVAL = 3;   // 秒
-const QUEEN_SUMMON_COUNT = 10;     // 1回の召喚数
-const BEE_LIMIT = 60;              // 蜂の上限
+const QUEEN_SUMMON_INTERVAL = 3;
+const QUEEN_SUMMON_COUNT = 10;
+const BEE_LIMIT = 60;
 
 function addHitStop(t) { if (t > hitStop) hitStop = t; }
 function addShake(mag, dur) {
@@ -358,7 +402,6 @@ function countBees() {
 
 function pickEnemyType() {
   const t = elapsed;
-  /* 蜂は女王蜂の召喚専用（通常出現なし） */
   const pool = [
     { type: ENEMY_TYPES[0], w: 5 },
     { type: ENEMY_TYPES[1], w: t > 5 ? 4 : 0 },
@@ -695,6 +738,11 @@ function update(dt) {
     vibrate([60, 40, 90]);
     queenBee = null;
 
+    /* 撃破した瞬間に保存 */
+    queenbeeKills++;
+    saveKills(KILL_KEY_QUEEN, queenbeeKills);
+    refreshStars();
+
     let beeCount = 0;
     const remain = [];
     for (const e of enemies) {
@@ -711,7 +759,6 @@ function update(dt) {
     const px0 = midBossPos ? midBossPos.x : player.x;
     const py0 = midBossPos ? midBossPos.y : player.y;
     for (let i = 0; i < orbCount; i++) {
-      const a = (Math.PI * 2 / orbCount) * i;
       orbs.push({ x: px0, y: py0, r: 6, exp: perOrb });
     }
 
@@ -722,11 +769,19 @@ function update(dt) {
     }, 1200);
   }
 
-  if (bossDefeated && soundOn) {
-    AudioEngine.stopBGM();
-    AudioEngine.seBossDefeat();
+  if (bossDefeated) {
+    if (soundOn) {
+      AudioEngine.stopBGM();
+      AudioEngine.seBossDefeat();
+    }
     addShake(18, 0.5);
     vibrate([60, 40, 120]);
+
+    /* 撃破した瞬間に保存 */
+    redeyeKills++;
+    saveKills(KILL_KEY_RED, redeyeKills);
+    refreshStars();
+
     setTimeout(() => {
       if (!gameOver && soundOn) {
         AudioEngine.startBGM();
@@ -1110,6 +1165,7 @@ function showOverlay(title, msg, btnText) {
   speedBar.classList.add('hidden');
   overlayEl.classList.remove('hidden');
   refreshHiscore();
+  refreshStars();
 }
 
 function showStartScreen() {
@@ -1122,6 +1178,7 @@ function showStartScreen() {
   speedBar.classList.add('hidden');
   overlayEl.classList.remove('hidden');
   refreshHiscore();
+  refreshStars();
 }
 
 function doPause() {
