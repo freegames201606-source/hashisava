@@ -41,6 +41,7 @@ canvas { display: block; touch-action: none; }
 .top-btn:active { transform: scale(0.95); }
 .top-btn.muted { border-color: #666; color: #666; }
 
+/* TEST MODE バッジ（ゲーム中・右上） */
 #test-badge {
   position: fixed;
   top: calc(60px + var(--sat));
@@ -58,6 +59,7 @@ canvas { display: block; touch-action: none; }
 }
 #test-badge.hidden { display: none; }
 
+/* テストモード時の速度変更バー（プレイ中・左下） */
 #speed-bar {
   position: fixed;
   bottom: calc(12px + var(--sab));
@@ -166,18 +168,12 @@ canvas { display: block; touch-action: none; }
   letter-spacing: 3px;
   color: #4fc3f7;
   text-shadow: 0 0 20px rgba(79,195,247,0.6);
-  cursor: default;
+  cursor: pointer;
   touch-action: manipulation;
-}
-#overlay-subtitle {
-  margin: 0;
-  font-size: 20px;
-  letter-spacing: 2px;
-  color: #ffd54f;
-  text-shadow: 0 0 12px rgba(255,213,79,0.5);
 }
 #overlay-msg { margin: 0; opacity: 0.85; font-size: 14px; }
 
+/* スタート画面の TEST MODE 表示 */
 #overlay-test-badge {
   margin: 4px 0;
   padding: 6px 16px;
@@ -218,31 +214,6 @@ canvas { display: block; touch-action: none; }
   background: #263a4a;
   border-color: #4fc3f7;
   box-shadow: 0 0 12px rgba(79,195,247,0.4);
-}
-
-/* スタート画面の音ボタン */
-#sound-block {
-  margin: 4px 0;
-  display: flex;
-  justify-content: center;
-}
-.sound-btn {
-  padding: 10px 22px;
-  font-size: 14px;
-  font-weight: bold;
-  color: #fff;
-  background: #1e1e2a;
-  border: 2px solid #4fc3f7;
-  border-radius: 999px;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: transform 0.1s, background 0.1s, border-color 0.1s, color 0.1s;
-}
-.sound-btn:active { transform: scale(0.96); }
-.sound-btn.muted {
-  color: #666;
-  border-color: #444;
-  background: #15151c;
 }
 
 #overlay-help {

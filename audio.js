@@ -10,8 +10,9 @@ const AudioEngine = (() => {
 
   let bgmTimer = null;
   let bgmStep = 0;
-  let currentBgm = null; // 'main' | 'boss' | 'midboss' | null
+  let currentBgm = null; // 'main' | 'boss' | null
 
+  // サイレン用
   let sirenOsc = null;
   let sirenLfo = null;
   let sirenGain = null;
@@ -37,7 +38,10 @@ const AudioEngine = (() => {
     if (ctx && ctx.state === 'suspended') ctx.resume();
   }
 
-  /* ---------- 効果音 ---------- */
+  /* =========================================================
+     効果音
+     ========================================================= */
+
   function seShoot() {
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -116,47 +120,32 @@ const AudioEngine = (() => {
     });
   }
 
-  /* ---------- 蜂の羽音（ブーン） ---------- */
-  function seBeeBuzz() {
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(180, t);
-    o.frequency.linearRampToValueAtTime(140, t + 0.25);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-    const f = ctx.createBiquadFilter();
-    f.type = 'bandpass';
-    f.frequency.value = 400;
-    o.connect(f); f.connect(g); g.connect(seGain);
-    o.start(t); o.stop(t + 0.3);
-  }
+  /* ---------- 警告サイレン（低音が揺れる） ---------- */
 
-  /* ---------- 警告サイレン ---------- */
   function startSiren() {
     if (!ctx) return;
-    if (sirenOsc) return;
+    if (sirenOsc) return; // すでに鳴っている
+
     const t = ctx.currentTime;
 
     sirenOsc = ctx.createOscillator();
     sirenOsc.type = 'sawtooth';
-    sirenOsc.frequency.value = 220;
+    sirenOsc.frequency.value = 220; // 低めのA3
 
     sirenGain = ctx.createGain();
     sirenGain.gain.setValueAtTime(0.0001, t);
     sirenGain.gain.exponentialRampToValueAtTime(0.32, t + 0.3);
 
+    /* LFO で音程を揺らす（サイレン） */
     sirenLfo = ctx.createOscillator();
     sirenLfo.type = 'sine';
-    sirenLfo.frequency.value = 0.9;
+    sirenLfo.frequency.value = 0.9; // 1秒に約1往復
     const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 80;
+    lfoGain.gain.value = 80; // ±80Hz 揺らす
     sirenLfo.connect(lfoGain);
     lfoGain.connect(sirenOsc.frequency);
 
+    /* ローパスで丸みを持たせる */
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.value = 1400;
@@ -185,11 +174,13 @@ const AudioEngine = (() => {
     sirenGain = null;
   }
 
-  /* ---------- 登場ファンファーレ（赤ロボ） ---------- */
+  /* ---------- 登場ファンファーレ ---------- */
+
   function seBossAppear() {
     if (!ctx) return;
     const t = ctx.currentTime;
 
+    /* 低音の「ドーン」 */
     const o1 = ctx.createOscillator();
     const g1 = ctx.createGain();
     o1.type = 'sawtooth';
@@ -200,6 +191,7 @@ const AudioEngine = (() => {
     o1.connect(g1); g1.connect(seGain);
     o1.start(t); o1.stop(t + 0.75);
 
+    /* 上昇する不気味な音 */
     const o2 = ctx.createOscillator();
     const g2 = ctx.createGain();
     o2.type = 'triangle';
@@ -211,7 +203,8 @@ const AudioEngine = (() => {
     o2.connect(g2); g2.connect(seGain);
     o2.start(t); o2.stop(t + 0.8);
 
-    [0, 0.15, 0.3].forEach((delay) => {
+    /* 短い3連打 */
+    [0, 0.15, 0.3].forEach((delay, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.type = 'square';
@@ -225,45 +218,12 @@ const AudioEngine = (() => {
     });
   }
 
-  /* ---------- 中ボス登場ファンファーレ（女王蜂） ---------- */
-  function seMidBossAppear() {
-    if (!ctx) return;
-    const t = ctx.currentTime;
+  /* ---------- 撃破ファンファーレ ---------- */
 
-    /* 蜂の羽音風（ブーン） */
-    const o1 = ctx.createOscillator();
-    const g1 = ctx.createGain();
-    o1.type = 'sawtooth';
-    o1.frequency.setValueAtTime(200, t);
-    o1.frequency.linearRampToValueAtTime(120, t + 0.8);
-    g1.gain.setValueAtTime(0.0001, t);
-    g1.gain.exponentialRampToValueAtTime(0.35, t + 0.05);
-    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-    const f = ctx.createBiquadFilter();
-    f.type = 'bandpass';
-    f.frequency.value = 500;
-    o1.connect(f); f.connect(g1); g1.connect(seGain);
-    o1.start(t); o1.stop(t + 0.95);
-
-    /* 短い3連打 */
-    [0.1, 0.25, 0.4].forEach((delay) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = 'triangle';
-      o.frequency.value = 660;
-      const st = t + delay;
-      g.gain.setValueAtTime(0.0001, st);
-      g.gain.exponentialRampToValueAtTime(0.3, st + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, st + 0.15);
-      o.connect(g); g.connect(seGain);
-      o.start(st); o.stop(st + 0.17);
-    });
-  }
-
-  /* ---------- 撃破ファンファーレ（赤ロボ） ---------- */
   function seBossDefeat() {
     if (!ctx) return;
     const t = ctx.currentTime;
+    /* 上昇する明るいメロディ */
     const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
     notes.forEach((freq, i) => {
       const o = ctx.createOscillator();
@@ -277,6 +237,7 @@ const AudioEngine = (() => {
       o.connect(g); g.connect(seGain);
       o.start(st); o.stop(st + 0.32);
     });
+    /* 最後の和音 */
     const chord = [523.25, 659.25, 783.99];
     chord.forEach(freq => {
       const o = ctx.createOscillator();
@@ -292,26 +253,10 @@ const AudioEngine = (() => {
     });
   }
 
-  /* ---------- 撃破ファンファーレ（女王蜂：短め） ---------- */
-  function seMidBossDefeat() {
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    const notes = [440, 554.37, 659.25, 880];
-    notes.forEach((freq, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = 'triangle';
-      o.frequency.value = freq;
-      const st = t + i * 0.07;
-      g.gain.setValueAtTime(0.0001, st);
-      g.gain.exponentialRampToValueAtTime(0.35, st + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, st + 0.22);
-      o.connect(g); g.connect(seGain);
-      o.start(st); o.stop(st + 0.24);
-    });
-  }
+  /* =========================================================
+     BGM（通常）
+     ========================================================= */
 
-  /* ---------- BGM（通常：明るいチップチューン） ---------- */
   const MELODY = [
     659.25, 0, 783.99, 0, 880, 0, 783.99, 0,
     659.25, 0, 587.33, 0, 523.25, 0, 0, 0,
@@ -326,8 +271,13 @@ const AudioEngine = (() => {
   ];
   const STEP_MS_MAIN = 200;
 
-  /* ---------- BGM（赤ロボ：短調・ダーク・速め） ---------- */
+  /* =========================================================
+     BGM（ボス：短調・ダーク・速め）
+     ========================================================= */
+
+  /* A minor（A C E） */
   const BOSS_MELODY = [
+    /* 4小節 × 8ステップ */
     220.00, 0, 261.63, 0, 329.63, 0, 261.63, 0,
     246.94, 0, 220.00, 0, 196.00, 0, 0, 0,
     220.00, 0, 261.63, 0, 329.63, 0, 392.00, 0,
@@ -341,28 +291,13 @@ const AudioEngine = (() => {
   ];
   const STEP_MS_BOSS = 130;
 
-  /* ---------- BGM（中ボス：軽快・短調） ---------- */
-  const MID_MELODY = [
-    329.63, 0, 349.23, 0, 392.00, 0, 349.23, 0,
-    329.63, 0, 293.66, 0, 261.63, 0, 0, 0,
-    293.66, 0, 329.63, 0, 392.00, 0, 440.00, 0,
-    392.00, 0, 329.63, 0, 293.66, 0, 0, 0,
-  ];
-  const MID_BASS = [
-    82.41, 0, 0, 82.41, 0, 0, 82.41, 0,
-    87.31, 0, 0, 87.31, 0, 0, 87.31, 0,
-    98.00, 0, 0, 98.00, 0, 0, 98.00, 0,
-    82.41, 0, 0, 82.41, 0, 0, 82.41, 0,
-  ];
-  const STEP_MS_MID = 160;
-
   function tickBGM() {
     if (!ctx) return;
     const t = ctx.currentTime;
-
     if (currentBgm === 'main') {
       const m = MELODY[bgmStep % MELODY.length];
       const b = BASS[bgmStep % BASS.length];
+
       if (m > 0) {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
@@ -388,6 +323,8 @@ const AudioEngine = (() => {
     } else if (currentBgm === 'boss') {
       const m = BOSS_MELODY[bgmStep % BOSS_MELODY.length];
       const b = BOSS_BASS[bgmStep % BOSS_BASS.length];
+
+      /* 鋸波のリード */
       if (m > 0) {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
@@ -402,6 +339,8 @@ const AudioEngine = (() => {
         o.connect(f); f.connect(g); g.connect(bgmGain);
         o.start(t); o.stop(t + 0.14);
       }
+
+      /* 低音ベース（太め） */
       if (b > 0) {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
@@ -413,6 +352,8 @@ const AudioEngine = (() => {
         o.connect(g); g.connect(bgmGain);
         o.start(t); o.stop(t + 0.17);
       }
+
+      /* ハイハット風ノイズ */
       if (bgmStep % 2 === 1) {
         const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
         const d = buf.getChannelData(0);
@@ -427,31 +368,6 @@ const AudioEngine = (() => {
         f.frequency.value = 4000;
         src.connect(f); f.connect(g); g.connect(bgmGain);
         src.start(t);
-      }
-    } else if (currentBgm === 'midboss') {
-      const m = MID_MELODY[bgmStep % MID_MELODY.length];
-      const b = MID_BASS[bgmStep % MID_BASS.length];
-      if (m > 0) {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'square';
-        o.frequency.value = m;
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.15, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-        o.connect(g); g.connect(bgmGain);
-        o.start(t); o.stop(t + 0.18);
-      }
-      if (b > 0) {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'triangle';
-        o.frequency.value = b;
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.28, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-        o.connect(g); g.connect(bgmGain);
-        o.start(t); o.stop(t + 0.22);
       }
     }
     bgmStep++;
@@ -478,13 +394,6 @@ const AudioEngine = (() => {
     _startBgmLoop(STEP_MS_BOSS);
   }
 
-  function startMidBossBGM() {
-    if (!ctx) return;
-    if (currentBgm === 'midboss') return;
-    currentBgm = 'midboss';
-    _startBgmLoop(STEP_MS_MID);
-  }
-
   function stopBGM() {
     if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
     currentBgm = null;
@@ -496,11 +405,9 @@ const AudioEngine = (() => {
   return {
     init, resume,
     seShoot, seHit, seLevelUp, seGameOver,
-    seBeeBuzz,
     seBossAppear, seBossDefeat,
-    seMidBossAppear, seMidBossDefeat,
     startSiren, stopSiren,
-    startBGM, startBossBGM, startMidBossBGM, stopBGM,
+    startBGM, startBossBGM, stopBGM,
     setBGMVolume, setSEVolume,
   };
 })();
