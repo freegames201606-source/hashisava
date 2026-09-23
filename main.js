@@ -169,6 +169,7 @@ function killsToStars(kills) {
 }
 
 function refreshStars() {
+  if (!redStarsEl || !yellowStarsEl) return;
   const redN = killsToStars(redeyeKills);
   const yellowN = killsToStars(queenbeeKills);
 
@@ -738,10 +739,9 @@ function update(dt) {
     vibrate([60, 40, 90]);
     queenBee = null;
 
-    /* 撃破した瞬間に保存 */
+    /* 撃破した瞬間に保存（DOM更新はスタート画面/ゲームオーバーで） */
     queenbeeKills++;
     saveKills(KILL_KEY_QUEEN, queenbeeKills);
-    refreshStars();
 
     let beeCount = 0;
     const remain = [];
@@ -777,10 +777,9 @@ function update(dt) {
     addShake(18, 0.5);
     vibrate([60, 40, 120]);
 
-    /* 撃破した瞬間に保存 */
+    /* 撃破した瞬間に保存（DOM更新はスタート画面/ゲームオーバーで） */
     redeyeKills++;
     saveKills(KILL_KEY_RED, redeyeKills);
-    refreshStars();
 
     setTimeout(() => {
       if (!gameOver && soundOn) {
