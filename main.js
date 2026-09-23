@@ -110,6 +110,8 @@ const ASSETS = {
     panda: './assets/enemies/panda.svg',
     rabbit: './assets/enemies/rabbit.svg',
     redeye: './assets/enemies/red-eye.png',
+    bee: './assets/enemies/bee.svg',
+    queenbee: './assets/enemies/queenbee.svg',
   },
 };
 const images = { player: null, enemies: {} };
@@ -226,7 +228,7 @@ function updateSpeedBarVisibility() {
   if (first) first.classList.add('selected');
 })();
 
-/* ---- 難易度（初期：EASY） ---- */
+/* ---- 難易度 ---- */
 const DIFFICULTIES = {
   easy:   { enemyHpMul: 0.7, enemySpeedMul: 0.85, spawnMul: 1.25, damageMul: 0.7 },
   normal: { enemyHpMul: 1.0, enemySpeedMul: 1.0,  spawnMul: 1.0,  damageMul: 1.0 },
@@ -259,6 +261,8 @@ const ENEMY_TYPES = [
   { key: 'panda',  hp: 30,  speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',         drawScale: 1.5 },
   { key: 'rabbit', hp: 10,  speed: 110, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん',       drawScale: 1.5 },
   { key: 'redeye', hp: 300, speed: 260, r: 22, dmg: 60, exp: 60, color: '#e53935', name: '赤い彗星のかずき', drawScale: 1.5 },
+  { key: 'bee',    hp: 4,   speed: 160, r: 9,  dmg: 8,  exp: 2,  color: '#ffd54f', name: null,             drawScale: 1.0 },
+  { key: 'queenbee', hp: 120, speed: 70, r: 22, dmg: 30, exp: 0, color: '#ffca28', name: 'ファンネルひらた', drawScale: 1.5 },
 ];
 
 let player = null;
@@ -277,6 +281,13 @@ let redEyeSpawned = false;
 let sirenStarted = false;
 let bgmStoppedForWarning = false;
 let bossBgmPlaying = false;
+
+/* 中ボス（女王蜂）関連 */
+let queenBeeSpawned = false;
+let queenBee = null;         // 女王蜂の参照
+let queenSummonTimer = 0;    // 召喚間隔カウント
+const QUEEN_SUMMON_INTERVAL = 3;  // 秒
+const BEE_LIMIT = 20;        // 画面上の蜂の上限
 
 function addHitStop(t) { if (t > hitStop) hitStop = t; }
 function addShake(mag, dur) {
@@ -302,6 +313,7 @@ function resetGame() {
   level = 1; exp = 0; expNext = 5; pendingLevelUps = 0;
   hitStop = 0; shake = { time: 0, mag: 0 }; redFlash = 0; playerBarFlash = 0;
   redEyeSpawned = false; sirenStarted = false; bgmStoppedForWarning = false; bossBgmPlaying = false;
+  queenBeeSpawned = false; queenBee = null; queenSummonTimer = 0;
   gameSpeedMul = 1;
   if (speedBar) {
     const buttons = speedBar.querySelectorAll('.speed-btn');
@@ -322,13 +334,21 @@ function resetGame() {
   lastTime = performance.now();
 }
 
+function countBees() {
+  let n = 0;
+  for (const e of enemies) if (e.type.key === 'bee') n++;
+  return n;
+}
+
 function pickEnemyType() {
   const t = elapsed;
+  const beeWeight = (queenBeeSpawned && queenBee && queenBee.hp > 0) ? 0 : 3;  /* 女王蜂出現中は通常蜂を止める */
   const pool = [
     { type: ENEMY_TYPES[0], w: 5 },
-    { type: ENEMY_TYPES[1], w: t > 15 ? 4 : 0 },
-    { type: ENEMY_TYPES[3], w: t > 20 ? 0.5 : 0 },
-    { type: ENEMY_TYPES[2], w: t > 30 ? 0.5 : 0 },
+    { type: ENEMY_TYPES[1], w: t > 5 ? 4 : 0 },
+    { type: ENEMY_TYPES[3], w: t > 10 ? 1 : 0 },
+    { type: ENEMY_TYPES[2], w: t > 20 ? 1 : 0 },
+    { type: ENEMY_TYPES[5], w: t > 15 ? beeWeight : 0 },
   ];
   let total = 0;
   for (const p of pool) total += p.w;
@@ -353,6 +373,59 @@ function spawnEnemy() {
     speed: type.speed * (1 + elapsed * 0.002) * diff.enemySpeedMul,
     dmg: type.dmg * diff.damageMul, flash: 0,
   });
+}
+
+/* 女王蜂スポーン */
+function spawnQueenBee() {
+  const diff = stats.diff;
+  const type = ENEMY_TYPES[6];
+  const x = W / 2;
+  const y = -50;
+  const hp = type.hp * diff.enemyHpMul;
+  const q = {
+    type, x, y, r: type.r, hp, maxHp: hp,
+    speed: type.speed * diff.enemySpeedMul,
+    dmg: type.dmg * diff.damageMul, flash: 0,
+    isQueen: true,
+  };
+  enemies.push(q);
+  queenBee = q;
+  queenSummonTimer = 0;
+  addShake(14, 0.5);
+  vibrate([60, 40, 90]);
+
+  if (soundOn) {
+    AudioEngine.stopBGM();
+    AudioEngine.seMidBossAppear();
+    setTimeout(() => {
+      if (!gameOver && soundOn && queenBee && queenBee.hp > 0) {
+        AudioEngine.startMidBossBGM();
+      }
+    }, 900);
+  }
+}
+
+/* 女王蜂が蜂を召喚 */
+function summonBees(count) {
+  if (!queenBee) return;
+  const diff = stats.diff;
+  const type = ENEMY_TYPES[5];
+  const currentBees = countBees();
+  const canAdd = Math.max(0, BEE_LIMIT - currentBees);
+  const n = Math.min(count, canAdd);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const dist = 20 + Math.random() * 40;
+    const x = queenBee.x + Math.cos(a) * dist;
+    const y = queenBee.y + Math.sin(a) * dist;
+    const hp = type.hp * (1 + elapsed * 0.06) * diff.enemyHpMul;
+    enemies.push({
+      type, x, y, r: type.r, hp, maxHp: hp,
+      speed: type.speed * (1 + elapsed * 0.002) * diff.enemySpeedMul,
+      dmg: type.dmg * diff.damageMul, flash: 0,
+    });
+  }
+  if (n > 0 && soundOn) AudioEngine.seBeeBuzz();
 }
 
 function spawnRedEye() {
@@ -478,6 +551,22 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
+  /* 女王蜂出現判定（30秒） */
+  if (!queenBeeSpawned && elapsed >= 30) {
+    spawnQueenBee();
+    queenBeeSpawned = true;
+  }
+
+  /* 女王蜂の召喚 */
+  if (queenBee && queenBee.hp > 0) {
+    queenSummonTimer += dt;
+    if (queenSummonTimer >= QUEEN_SUMMON_INTERVAL) {
+      queenSummonTimer = 0;
+      summonBees(3);
+    }
+  }
+
+  /* 赤ロボ：47秒で警告開始、50秒で出現 */
   if (!redEyeSpawned) {
     if (elapsed > 47 && elapsed <= 50) {
       if (!bgmStoppedForWarning && soundOn) {
@@ -570,6 +659,7 @@ function update(dt) {
 
   const alive = [];
   let bossDefeated = false;
+  let midBossDefeated = false;
   for (const e of enemies) {
     if (e.hp <= 0) {
       orbs.push({ x: e.x, y: e.y, r: 5, exp: e.type.exp });
@@ -577,10 +667,57 @@ function update(dt) {
       addHitStop(0.04);
       addShake(4, 0.1);
       if (e.type.key === 'redeye') bossDefeated = true;
+      if (e.type.key === 'queenbee') midBossDefeated = true;
     } else alive.push(e);
   }
   enemies = alive;
 
+  /* 女王蜂撃破：蜂消滅 + 経験値まとめてドロップ */
+  if (midBossDefeated) {
+    if (soundOn) {
+      AudioEngine.stopBGM();
+      AudioEngine.seMidBossDefeat();
+    }
+    addShake(16, 0.5);
+    vibrate([60, 40, 90]);
+    queenBee = null;
+
+    /* 蜂を消して経験値をまとめてドロップ */
+    let beeCount = 0;
+    const remain = [];
+    for (const e of enemies) {
+      if (e.type.key === 'bee') {
+        spawnParticles(e.x, e.y, '#ffd54f', 4);
+        beeCount++;
+      } else {
+        remain.push(e);
+      }
+    }
+    enemies = remain;
+
+    /* 蜂1匹あたりexp 2 × 数の分を、女王蜂の位置にまとめてドロップ */
+    const totalBeeExp = beeCount * 2;
+    /* オーブを少し散らして生成（1個ずつだと多すぎるので、まとめて数個に） */
+    const orbCount = Math.max(1, Math.ceil(totalBeeExp / 4));
+    const perOrb = totalBeeExp / orbCount;
+    for (let i = 0; i < orbCount; i++) {
+      const a = (Math.PI * 2 / orbCount) * i;
+      orbs.push({
+        x: queenBee ? queenBee.x : player.x,
+        y: queenBee ? queenBee.y : player.y,
+        r: 6,
+        exp: perOrb,
+      });
+    }
+
+    setTimeout(() => {
+      if (!gameOver && soundOn && !redEyeSpawned) {
+        AudioEngine.startBGM();
+      }
+    }, 1200);
+  }
+
+  /* 赤ロボ撃破 */
   if (bossDefeated && soundOn) {
     AudioEngine.stopBGM();
     AudioEngine.seBossDefeat();
@@ -603,7 +740,7 @@ function update(dt) {
       o.y += (dy / dist) * pull * dt;
     }
   }
-  const remain = [];
+  const remain2 = [];
   for (const o of orbs) {
     const d = (player.x - o.x) ** 2 + (player.y - o.y) ** 2;
     if (d < (player.r + o.r) ** 2) {
@@ -613,9 +750,9 @@ function update(dt) {
         expNext = Math.floor(expNext * 1.35 + 3);
         pendingLevelUps++;
       }
-    } else remain.push(o);
+    } else remain2.push(o);
   }
-  orbs = remain;
+  orbs = remain2;
 
   for (const p of particles) {
     p.x += p.vx * dt; p.y += p.vy * dt;
