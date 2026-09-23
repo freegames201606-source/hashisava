@@ -10,6 +10,7 @@ const startBtn = document.getElementById('startBtn');
 const topBar = document.getElementById('top-bar');
 const pauseBtn = document.getElementById('pauseBtn');
 const soundBtn = document.getElementById('soundBtn');
+const overlaySoundBtn = document.getElementById('overlaySoundBtn');
 const pauseEl = document.getElementById('pause');
 const resumeBtn = document.getElementById('resumeBtn');
 const quitBtn = document.getElementById('quitBtn');
@@ -111,7 +112,7 @@ const ASSETS = {
     rabbit: './assets/enemies/rabbit.svg',
     redeye: './assets/enemies/red-eye.png',
     bee: './assets/enemies/bee.svg',
-    queenbee: './assets/enemies/queenbee.svg',
+    queenbee: './assets/enemies/queenbee.png',
   },
 };
 const images = { player: null, enemies: {} };
@@ -144,23 +145,37 @@ function refreshHiscore() {
   if (hiscoreValue) hiscoreValue.textContent = bestTime.toFixed(1);
 }
 
-/* ---- 音 ON/OFF ---- */
+/* ---- 音 ON/OFF（スタート画面とゲーム中で共有） ---- */
 let soundOn = true;
-function updateSoundBtn() {
-  if (soundOn) soundBtn.classList.remove('muted');
-  else soundBtn.classList.add('muted');
+function updateSoundUI() {
+  if (soundOn) {
+    soundBtn.classList.remove('muted');
+    overlaySoundBtn.classList.remove('muted');
+    overlaySoundBtn.textContent = '♪ 音: ON';
+  } else {
+    soundBtn.classList.add('muted');
+    overlaySoundBtn.classList.add('muted');
+    overlaySoundBtn.textContent = '♪ 音: OFF';
+  }
 }
-soundBtn.addEventListener('click', e => {
-  e.preventDefault(); e.stopPropagation();
+function toggleSound() {
   soundOn = !soundOn;
-  updateSoundBtn();
+  updateSoundUI();
   if (soundOn) {
     try { AudioEngine.resume(); AudioEngine.startBGM(); } catch (err) {}
   } else {
     try { AudioEngine.stopBGM(); AudioEngine.stopSiren(); } catch (err) {}
   }
+}
+soundBtn.addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation();
+  toggleSound();
 });
-updateSoundBtn();
+overlaySoundBtn.addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation();
+  toggleSound();
+});
+updateSoundUI();
 
 /* ---- テストモード ---- */
 let testMode = false;
@@ -284,10 +299,11 @@ let bossBgmPlaying = false;
 
 /* 中ボス（女王蜂）関連 */
 let queenBeeSpawned = false;
-let queenBee = null;         // 女王蜂の参照
-let queenSummonTimer = 0;    // 召喚間隔カウント
-const QUEEN_SUMMON_INTERVAL = 3;  // 秒
-const BEE_LIMIT = 20;        // 画面上の蜂の上限
+let queenBee = null;
+let queenSummonTimer = 0;
+const QUEEN_SUMMON_INTERVAL = 3;   // 秒
+const QUEEN_SUMMON_COUNT = 10;     // 1回の召喚数
+const BEE_LIMIT = 60;              // 蜂の上限
 
 function addHitStop(t) { if (t > hitStop) hitStop = t; }
 function addShake(mag, dur) {
@@ -342,13 +358,12 @@ function countBees() {
 
 function pickEnemyType() {
   const t = elapsed;
-  const beeWeight = (queenBeeSpawned && queenBee && queenBee.hp > 0) ? 0 : 3;  /* 女王蜂出現中は通常蜂を止める */
+  /* 蜂は女王蜂の召喚専用（通常出現なし） */
   const pool = [
     { type: ENEMY_TYPES[0], w: 5 },
     { type: ENEMY_TYPES[1], w: t > 5 ? 4 : 0 },
     { type: ENEMY_TYPES[3], w: t > 10 ? 1 : 0 },
     { type: ENEMY_TYPES[2], w: t > 20 ? 1 : 0 },
-    { type: ENEMY_TYPES[5], w: t > 15 ? beeWeight : 0 },
   ];
   let total = 0;
   for (const p of pool) total += p.w;
@@ -375,7 +390,6 @@ function spawnEnemy() {
   });
 }
 
-/* 女王蜂スポーン */
 function spawnQueenBee() {
   const diff = stats.diff;
   const type = ENEMY_TYPES[6];
@@ -405,7 +419,6 @@ function spawnQueenBee() {
   }
 }
 
-/* 女王蜂が蜂を召喚 */
 function summonBees(count) {
   if (!queenBee) return;
   const diff = stats.diff;
@@ -551,22 +564,19 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
-  /* 女王蜂出現判定（30秒） */
   if (!queenBeeSpawned && elapsed >= 30) {
     spawnQueenBee();
     queenBeeSpawned = true;
   }
 
-  /* 女王蜂の召喚 */
   if (queenBee && queenBee.hp > 0) {
     queenSummonTimer += dt;
     if (queenSummonTimer >= QUEEN_SUMMON_INTERVAL) {
       queenSummonTimer = 0;
-      summonBees(3);
+      summonBees(QUEEN_SUMMON_COUNT);
     }
   }
 
-  /* 赤ロボ：47秒で警告開始、50秒で出現 */
   if (!redEyeSpawned) {
     if (elapsed > 47 && elapsed <= 50) {
       if (!bgmStoppedForWarning && soundOn) {
@@ -660,6 +670,7 @@ function update(dt) {
   const alive = [];
   let bossDefeated = false;
   let midBossDefeated = false;
+  let midBossPos = null;
   for (const e of enemies) {
     if (e.hp <= 0) {
       orbs.push({ x: e.x, y: e.y, r: 5, exp: e.type.exp });
@@ -667,12 +678,14 @@ function update(dt) {
       addHitStop(0.04);
       addShake(4, 0.1);
       if (e.type.key === 'redeye') bossDefeated = true;
-      if (e.type.key === 'queenbee') midBossDefeated = true;
+      if (e.type.key === 'queenbee') {
+        midBossDefeated = true;
+        midBossPos = { x: e.x, y: e.y };
+      }
     } else alive.push(e);
   }
   enemies = alive;
 
-  /* 女王蜂撃破：蜂消滅 + 経験値まとめてドロップ */
   if (midBossDefeated) {
     if (soundOn) {
       AudioEngine.stopBGM();
@@ -682,32 +695,24 @@ function update(dt) {
     vibrate([60, 40, 90]);
     queenBee = null;
 
-    /* 蜂を消して経験値をまとめてドロップ */
     let beeCount = 0;
     const remain = [];
     for (const e of enemies) {
       if (e.type.key === 'bee') {
         spawnParticles(e.x, e.y, '#ffd54f', 4);
         beeCount++;
-      } else {
-        remain.push(e);
-      }
+      } else remain.push(e);
     }
     enemies = remain;
 
-    /* 蜂1匹あたりexp 2 × 数の分を、女王蜂の位置にまとめてドロップ */
     const totalBeeExp = beeCount * 2;
-    /* オーブを少し散らして生成（1個ずつだと多すぎるので、まとめて数個に） */
     const orbCount = Math.max(1, Math.ceil(totalBeeExp / 4));
     const perOrb = totalBeeExp / orbCount;
+    const px0 = midBossPos ? midBossPos.x : player.x;
+    const py0 = midBossPos ? midBossPos.y : player.y;
     for (let i = 0; i < orbCount; i++) {
       const a = (Math.PI * 2 / orbCount) * i;
-      orbs.push({
-        x: queenBee ? queenBee.x : player.x,
-        y: queenBee ? queenBee.y : player.y,
-        r: 6,
-        exp: perOrb,
-      });
+      orbs.push({ x: px0, y: py0, r: 6, exp: perOrb });
     }
 
     setTimeout(() => {
@@ -717,7 +722,6 @@ function update(dt) {
     }, 1200);
   }
 
-  /* 赤ロボ撃破 */
   if (bossDefeated && soundOn) {
     AudioEngine.stopBGM();
     AudioEngine.seBossDefeat();
